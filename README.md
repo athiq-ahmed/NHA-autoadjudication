@@ -125,6 +125,24 @@ Once running, access the application at:
 - **Manual setup**: Press `Ctrl+C` in each terminal
 - **Docker**: Run `docker-compose down`
 
+## Documentation
+
+Complete project documentation is available in the [docs/](docs/) folder:
+
+| Document | Purpose |
+|----------|---------|
+| [TECHNICAL.md](docs/TECHNICAL.md) | Complete system architecture, design patterns, Azure services integration, and solution design |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System components, interactions, data models, and API reference |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Deployment guides for local, staging, and production environments |
+| [INTEGRATION_TESTING.md](docs/INTEGRATION_TESTING.md) | Testing procedures and validation steps |
+| [QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md) | Command cheat sheet and quick lookup guide |
+
+**Quick Links:**
+- 📋 [View all documentation](docs/README.md)
+- 🏗️ [Architecture details](docs/ARCHITECTURE.md)
+- 🚀 [Deployment guide](docs/DEPLOYMENT.md)
+- 💻 [API Documentation](http://localhost:8000/docs) (when running)
+
 ## Live Mode
 
 The app includes Azure-ready service interfaces and environment variables for later integration:
