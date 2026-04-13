@@ -34,28 +34,96 @@ A few core ones included are:
 - `Planning`: the app structure separates models, pipeline orchestration, services, and UI so claim processing can be expanded step-by-step without collapsing into one monolithic flow.
 - `Multi-agent coordination`: the target production design supports specialist agents for OCR review, policy/rule reasoning, document research, and reviewer assistance.
 
-## Run
+## Prerequisites
 
-### Backend
+- Python 3.11+
+- Node.js 18+ and npm
+- Docker & Docker Compose (optional, for containerized deployment)
+
+## How to Run the Application
+
+### Option 1: Quick Start (Recommended - Windows)
 
 ```bash
+# From the root directory, run:
+start.bat
+```
+
+This will automatically:
+- Start the FastAPI backend on port 8000
+- Start the Next.js frontend on port 3000
+- Open the frontend in your default browser
+
+### Option 2: Manual Setup (Cross-Platform)
+
+#### Backend Setup
+
+```bash
+# Navigate to backend directory
 cd backend
+
+# Create a Python virtual environment (if not already created)
+python -m venv venv
+
+# Activate virtual environment
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Start the FastAPI server
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Frontend
+Backend will start on: `http://localhost:8000`
+
+#### Frontend Setup (in a new terminal)
 
 ```bash
+# Navigate to frontend directory
 cd frontend
+
+# Install dependencies
 npm install
+
+# Start the development server
 npm run dev
 ```
 
-### App URLs
+Frontend will start on: `http://localhost:3000`
 
-- Frontend: `http://localhost:3000`
-- Backend API: `http://localhost:8000`
-- API Docs: `http://localhost:8000/docs`
+### Option 3: Docker Deployment
+
+```bash
+# From the root directory, build and run with Docker Compose
+docker-compose up --build
+
+# To run in background
+docker-compose up -d --build
+
+# To stop
+docker-compose down
+```
+
+## App Access
+
+Once running, access the application at:
+
+| Component | URL |
+|-----------|-----|
+| **Frontend** | http://localhost:3000 |
+| **Backend API** | http://localhost:8000 |
+| **API Documentation** | http://localhost:8000/docs |
+| **Alternative API Docs** | http://localhost:8000/redoc |
+
+## Stopping the Application
+
+- **Windows (start.bat)**: Close the command prompt windows
+- **Manual setup**: Press `Ctrl+C` in each terminal
+- **Docker**: Run `docker-compose down`
 
 ## Live Mode
 
