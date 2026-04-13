@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Frontend build and dependencies
+frontend/.next/
+frontend/node_modules/
+
+# Logs
+*.log
+backend-api.*.log
+frontend-dev.*.log
+streamlit.*.log
+
+# Local environments
+backend/venv/
+backend/venv311/
+backend/.env
+frontend/.env.local
+
+# OS/editor
+.DS_Store
+Thumbs.db
