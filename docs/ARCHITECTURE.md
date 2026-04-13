@@ -1,8 +1,16 @@
-# Architecture & API Reference
+# Solution Architecture
 
-## System Architecture
+## System Overview
 
-### High-Level Overview
+The NHA Claims Auto-Adjudication System follows a modern **three-tier architecture** design:
+
+- **Presentation Tier**: Next.js React frontend (TypeScript + Tailwind CSS)
+- **Application Tier**: FastAPI backend (Python 3.11+, async/await)
+- **Data Tier**: Mock repository (extensible to SQL/NoSQL)
+
+---
+
+## High-Level Architecture Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -38,7 +46,7 @@
 │        │                 │                 │                    │
 │  ┌─────▼──┐        ┌──────▼──┐      ┌──────▼──┐              │
 │  │Dashboard│        │ Claims  │      │Analytics │              │
-│  │Route     │        │ Route   │      │Route     │              │
+│  │Route    │        │ Route   │      │Route     │              │
 │  └─────────┘        └────┬────┘      └──────────┘              │
 │                           │                                     │
 │  ┌─────────────────────────▼─────────────────────────┐        │
@@ -50,107 +58,286 @@
 │  └─────────────────────────┬───────────────────────┘        │
 │                            │                                   │
 │  ┌────────────────────────▼──────────────────────┐           │
-│  │       Mock Data Repository                    │           │
-│  │  (6 claims, 4 medical categories)            │           │
-│  │  (In-memory, could be replaced with DB)      │           │
+│  │       Data Repository Layer                   │           │
+│  │  - Mock Data (Development)                   │           │
+│  │  - Azure SQL Database (Production)           │           │
+│  │  - Cosmos DB (Optional NoSQL)                │           │
 │  └───────────────────────────────────────────────┘           │
+└─────────────────────────────────────────────────────────────────┘
+              │
+              │ External Service Integration
+              │
+┌─────────────▼───────────────────────────────────────────────────┐
+│                   EXTERNAL SERVICES (Azure)                      │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │ • Storage Account (Document storage)                  │    │
+│  │ • Form Recognizer (OCR/Document parsing)             │    │
+│  │ • OpenAI Service (LLM for classification)            │    │
+│  │ • SQL Database (Production data store)               │    │
+│  │ • Notification Services (Alerts & events)            │    │
+│  └────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Component Interaction Flow
+---
 
-**1. Dashboard Load**
+## Component Architecture
+
+### Frontend Components
+
+| Component | Purpose | Technology |
+|-----------|---------|-----------|
+| **Dashboard** | KPI metrics, trends, claim queues | React, Chart.js, Tailwind |
+| **Claims List** | Paginated claims table with filters | React, Axios, TypeScript |
+| **Claim Detail** | Full claim information with timeline | React, Tabs, Modal UI |
+| **Analytics** | Operational dashboards and trends | React, Charts, Data viz |
+| **Navigation** | Top navigation and sidebar | React components |
+
+### Backend Routes
+
+| Route | Purpose | Handler |
+|-------|---------|---------|
+| `/api/dashboard/*` | Dashboard metrics and trends | `routes/dashboard.py` |
+| `/api/claims/*` | Claim CRUD operations | `routes/claims.py` |
+| `/api/analytics/*` | Analytics and reporting | `routes/analytics.py` |
+| `/api/rules/*` | Rule engine operations | `routes/rules.py` |
+
+### Processing Pipeline
+
 ```
-Browser → /api/dashboard/metrics → Backend aggregates KPIs → JSON response
-       ↘ /api/dashboard/trends → Daily claim projections
-       ↘ /api/dashboard/status-distribution → Pass/Fail/Conditional split
-       ↘ /api/claims/queue/manual-review → High-priority claims
-Display → 5 KPI cards + 3 charts + queue table
+┌──────────────┐
+│  New Claim   │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────────────────┐
+│  Temporal Validation     │
+│  - Admission/Discharge   │
+│  - LOS calculation       │
+└──────┬───────────────────┘
+       │
+       ▼
+┌──────────────────────────┐
+│  STG Rules Engine        │
+│  - Cardiac, Ortho, etc.  │
+│  - Amount matching       │
+└──────┬───────────────────┘
+       │
+       ▼
+┌──────────────────────────┐
+│  Financial Validation    │
+│  - Amount checks         │
+│  - Extra docs review     │
+└──────┬───────────────────┘
+       │
+       ▼
+┌──────────────────────────┐
+│  Confidence Scoring      │
+│  - Rule match %          │
+│  - Evidence weight       │
+└──────┬───────────────────┘
+       │
+       ▼
+┌──────────────────────────┐
+│  Decision Output         │
+│  - Pass/Fail/Conditional│
+│  - Explanation           │
+└──────────────────────────┘
 ```
 
-**2. Claims List & Filter**
-```
-Browser → /api/claims/list?status=pass&complexity=5-10 → Backend filters
-Filter logic:
-  - Match status (if provided)
-  - Match complexity range
-  - Match confidence range
-  - Match search term (claim_id / patient_name)
-Display → Paginated table with 6 mock claims
-```
-
-**3. Claim Detail Drill-Down**
-```
-Browser → /api/claims/{claim_id} → Backend retrieves claim object
-       ↘ /api/claims/{claim_id}/timeline → Event history
-       ↘ /api/claims/{claim_id}/rules → Validation results
-Display → Tabs: Overview | Validation | Timeline | Notes
-```
+---
 
 ## Data Models
 
-### Claim Object (ClaimDetail)
+### Core Entities
 
-```typescript
-interface ClaimDetail {
-  claim_id: string;           // Unique identifier
-  patient_name: string;       // Full name
-  patient_age: number;        // Age in years
-  patient_gender: string;     // "M" | "F" | "Other"
-  hospital: string;           // Hospital name
-  admission_date: string;     // ISO 8601 date
-  discharge_date: string;     // ISO 8601 date
-  diagnosis: string;          // Primary diagnosis
-  procedures: string[];       // Procedure list
-  package: string;            // STG package type (Cardiac, Ortho, etc.)
-  stg_amount: number;         // Guideline amount in ₹
-  claimed_amount: number;     // Amount claimed in ₹
-  approved_amount?: number;   // Amount approved (after adjudication)
-  status: string;             // "pass" | "conditional" | "fail"
-  confidence: number;         // 0.0 to 1.0 (0-100%)
-  los_days: number;           // Length of stay in days
-  complexity: number;         // 1-100 complexity score
-  extra_docs: number;         // Count of extra documents attached
-}
+#### Claim
+```python
+class Claim(BaseModel):
+    claim_id: str                          # Unique identifier
+    patient_name: str                      # Full name
+    patient_age: int                       # Age
+    patient_gender: str                    # M/F/Other
+    hospital: str                          # Hospital name
+    admission_date: datetime               # Admission timestamp
+    discharge_date: datetime               # Discharge timestamp
+    diagnosis: str                         # Primary diagnosis
+    procedures: List[str]                  # Procedure codes
+    package: str                           # STG package (Cardiac, Ortho, etc.)
+    stg_amount: float                      # Guideline amount (₹)
+    claimed_amount: float                  # Claimed amount (₹)
+    los_days: int                          # Length of stay
+    complexity_score: int                  # Complexity (1-100)
+    status: str                            # pass|conditional|fail
+    confidence: float                      # Confidence (0.0-1.0)
+    extra_docs: int                        # Extra document count
+    created_at: datetime                   # Submission timestamp
+    updated_at: datetime                   # Last update timestamp
 ```
 
-### Dashboard Metrics
-
-```typescript
-interface DashboardMetrics {
-  total_claims: number;       // All claims count
-  auto_approved: number;      // Pass status count
-  manual_review: number;      // Conditional status count
-  rejection_rate: number;     // Fail / total ratio
-  avg_confidence: number;     // Mean confidence score
-  avg_complexity: number;     // Mean complexity
-}
+#### ValidationRule
+```python
+class ValidationRule(BaseModel):
+    category: str                          # Rule category (Temporal, Financial, etc.)
+    rule_name: str                         # Rule identifier
+    status: str                            # pass|fail|warning
+    details: str                           # Human-readable explanation
+    evidence: Dict[str, Any]               # Supporting data
+    severity: str                          # critical|warning|info
 ```
 
-### Validation Rule
-
-```typescript
-interface ValidationRule {
-  category: string;           // Rule category (Temporal, Financial, STG, etc.)
-  rule: string;              // Rule name
-  status: "pass" | "fail" | "warning";
-  details: string;           // Explanation
-  evidence?: object;         // Supporting data
-}
+#### Dashboard Metrics
+```python
+class DashboardMetrics(BaseModel):
+    total_claims: int
+    auto_approved: int
+    manual_review: int
+    rejection_rate: float
+    avg_confidence: float
+    avg_los: int
+    pending_since_days: int
 ```
 
-### Timeline Event
-
-```typescript
-interface TimelineEvent {
-  date: string;              // Timestamp (ISO 8601)
-  event: string;             // Event description
-  actor: string;             // "system" | "auto_adjudication" | user ID
-  metadata?: object;         // Additional context
-}
+#### TimelineEvent
+```python
+class TimelineEvent(BaseModel):
+    timestamp: datetime
+    event_type: str                        # submitted|auto_approved|reviewed|updated
+    description: str
+    actor: str                             # system|user_id|ai_agent
+    metadata: Dict[str, Any]               # Context data
 ```
 
-## API Reference
+---
+
+## Component Interaction Flows
+
+### Dashboard Load Flow
+```
+Browser Request
+    ↓
+Frontend → /api/dashboard/metrics
+    ↓
+Backend aggregates data
+    ├─ Counts total claims
+    ├─ Calculates auto-approved
+    ├─ Identifies manual review queue
+    ├─ Computes rejection rate
+    └─ Calculates average confidence
+    ↓
+JSON Response
+    ↓
+Frontend renders KPI cards + charts
+```
+
+### Claims List & Filter Flow
+```
+User applies filters (status, complexity, search)
+    ↓
+Frontend → /api/claims/list?status=pass&complexity=5-10
+    ↓
+Backend filter logic
+    ├─ Match status (if provided)
+    ├─ Match complexity range
+    ├─ Match confidence range
+    └─ Match search term (claim_id / patient_name)
+    ↓
+Paginated JSON Response
+    ↓
+Frontend displays filtered table
+```
+
+### Claim Detail Flow
+```
+User clicks on claim row
+    ↓
+Frontend requests /api/claims/{claim_id}
+    ↓
+Backend retrieves claim object
+    ↓
+Frontend fetches additional data
+    ├─ /api/claims/{claim_id}/timeline
+    ├─ /api/claims/{claim_id}/rules
+    └─ /api/claims/{claim_id}/documents
+    ↓
+Frontend renders tabs: Overview | Validation | Timeline | Notes
+```
+
+---
+
+## Database Schema
+
+### Claims Table (SQL)
+```sql
+CREATE TABLE claims (
+    claim_id NVARCHAR(50) PRIMARY KEY,
+    patient_name NVARCHAR(100),
+    patient_age INT,
+    hospital NVARCHAR(100),
+    admission_date DATETIME,
+    discharge_date DATETIME,
+    status NVARCHAR(20),           -- pass|conditional|fail
+    confidence FLOAT,              -- 0.0-1.0
+    stg_amount DECIMAL(12,2),
+    claimed_amount DECIMAL(12,2),
+    complexity_score INT,
+    created_at DATETIME DEFAULT GETUTCDATE(),
+    updated_at DATETIME DEFAULT GETUTCDATE()
+);
+
+CREATE INDEX idx_status ON claims(status);
+CREATE INDEX idx_created_at ON claims(created_at);
+```
+
+### Validations Table (SQL)
+```sql
+CREATE TABLE validations (
+    id INT PRIMARY KEY IDENTITY,
+    claim_id NVARCHAR(50),
+    rule_name NVARCHAR(100),
+    status NVARCHAR(20),           -- pass|fail|warning
+    details TEXT,
+    FOREIGN KEY (claim_id) REFERENCES claims(claim_id)
+);
+```
+
+---
+
+## Deployment Architecture
+
+### Development
+- Local machine or Docker
+- In-memory mock data
+- SQLite optional
+
+### Staging & Production
+- Azure Container Instances or App Service
+- Azure SQL Database
+- Azure Storage for documents
+- Load Balancer/APIM for API management
+
+---
+
+## Technology Stack
+
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| **Frontend** | Next.js | 14+ |
+| **Frontend** | React | 18+ |
+| **Frontend** | TypeScript | 5+ |
+| **Frontend** | Tailwind CSS | 3+ |
+| **Backend** | FastAPI | 0.104+ |
+| **Backend** | Python | 3.11+ |
+| **Backend** | Uvicorn | 0.24+ |
+| **Database** | Azure SQL / SQLite | Latest |
+| **Container** | Docker | Latest |
+| **Cloud** | Azure | - |
+
+---
+
+**Document Version**: 1.0  
+**Last Updated**: April 13, 2026  
+**Focus**: Solution Architecture & System Design
 
 ### Base URL
 - **Development**: `http://localhost:8000/api`
